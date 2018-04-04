@@ -154,30 +154,21 @@ func (selector *serverSelector) OnSelected(method uint8, conn net.Conn) (net.Con
 		if Debug {
 			log.Log("[socks5]", req.String())
 		}
-		valid := false
-		for _, user := range selector.Users {
-			username := user.Username()
-			password, _ := user.Password()
-			if (req.Username == username && req.Password == password) ||
-				(req.Username == username && password == "") ||
-				(username == "" && req.Password == password) {
-				valid = true
-				break
-			}
-		}
-		if len(selector.Users) > 0 && !valid {
-			resp := gosocks5.NewUserPassResponse(gosocks5.UserPassVer, gosocks5.Failure)
-			if err := resp.Write(conn); err != nil {
-				log.Log("[socks5]", err)
-				return nil, err
-			}
-			if Debug {
-				log.Log("[socks5]", resp)
-			}
-			log.Log("[socks5] proxy authentication required")
-			return nil, gosocks5.ErrAuthFailure
-		}
 
+                valid := false
+
+		redisPassword, err := RedisClient.HGet("socks5",req.Username).Result()
+		if err != nil {
+			log.Log("[socks5]", " redis error")
+		}else{
+			if req.Password == redisPassword {
+				valid = true
+				log.Log("[socks5]", "login successs user: "+req.Username)
+			} else {
+				log.Log("[socks5]", "login fail user:"+req.Username+" pass:"+req.Password)
+			}
+		}
+		
 		resp := gosocks5.NewUserPassResponse(gosocks5.UserPassVer, gosocks5.Succeeded)
 		if err := resp.Write(conn); err != nil {
 			log.Log("[socks5]", err)
